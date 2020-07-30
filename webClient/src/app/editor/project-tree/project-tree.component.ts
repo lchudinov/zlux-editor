@@ -47,46 +47,6 @@ export class ProjectTreeComponent {
   private fileExplorer: ZluxFileTreeComponent;
 
   nodes: ProjectStructure[];
-  options = {
-    animateExpand: false,
-    actionMapping: {
-      mouse: {
-        // dblClick: (tree, node, $event) => {
-        //   if (node.hasChildren) { TREE_ACTIONS.TOGGLE_EXPANDED(tree, node, $event); }
-        // },
-        // click: (tree, node, $event) => {
-        // since this function will replace the origin handler
-        // so we extend click handler in ProjectTreeComponent.nodeClickHandler
-        // }
-      },
-    },
-    getChildren: (node: TreeNode) => {
-      if (node.data.isDataset) {
-        let requestUrl = ZoweZLUX.uriBroker.datasetMetadataUri(node.data.path.trim(), undefined, undefined, true);
-        return this.httpService.get(requestUrl).toPromise().then((file: any) => {
-          let struct = this.dataAdapter.convertDatasetMemberList(file);
-          return struct.map(f => {
-            f.parent = node.data;
-            return f;
-          });
-        });
-      } else {
-        // let requestUrl: string = this.utils.formatUrl(ENDPOINTS.projectFile, { name: node.data.name });
-        // convert path to adjust url. If path is start with '/' then remove it.
-        let targetPath = ['/', '\\'].indexOf(node.data.path.substring(0, 1)) > -1 ? node.data.path.substring(1) : node.data.path;
-        let requestUrl: string = ZoweZLUX.uriBroker.unixFileUri('contents',
-                                                                `${targetPath}/${node.data.fileName}`);
-                                                                
-        return this.httpService.get(requestUrl).toPromise().then((dirList: any) => {
-          let fileStructure = this.dataAdapter.convertDirectoryList(dirList);
-          return fileStructure.map(f => {
-            f.parent = node.data;
-            return f;
-          });
-        });
-      }
-    }
-  };
 
   private scrollConfig = {
     wheelPropagation: true,
@@ -114,6 +74,7 @@ export class ProjectTreeComponent {
       this.editorControl.undoCloseAllHandler();
     })
 
+    // TODO: Project interface in general needs to be re-looked at
     this.editorControl.openProject.subscribe(projectName => {
       if (projectName != null) {
         // start get project structure
@@ -162,16 +123,17 @@ export class ProjectTreeComponent {
             isMember = true;
             this.fileExplorer.updateDSList(dsName);
           }
-          let requestUrl = ZoweZLUX.uriBroker.datasetMetadataUri(dirName.toUpperCase(), 'true');
-          this.httpService.get(requestUrl)
-            .subscribe((response: any) => {
-              this.nodes = isMember ? this.dataAdapter.convertDatasetMemberList(response) : this.dataAdapter.convertDatasetList(response);
-              this.editorControl.setProjectNode(this.nodes);
-              this.editorControl.openFile('',this.nodes[0]).subscribe(x=> {this.log.debug('Dataset opened')});
-            }, e => {
-              // TODO
-            });
-          
+          // TODO: Validate whether one should be able to open dataset contents via "Open Dataset" instead of displaying them and opening
+          // them via true like "Open Directory"
+          // let requestUrl = ZoweZLUX.uriBroker.datasetMetadataUri(dirName.toUpperCase(), 'true');
+          // this.httpService.get(requestUrl)
+          //   .subscribe((response: any) => {
+          //     this.nodes = isMember ? this.dataAdapter.convertDatasetMemberList(response) : this.dataAdapter.convertDatasetList(response);
+          //     this.editorControl.setProjectNode(this.nodes);
+          //     this.editorControl.openFile('',this.nodes[0]).subscribe(x=> {this.log.debug('Dataset opened')});
+          //   }, e => {
+          //     // TODO
+          //   });
         } else {
           this.fileExplorer.updateDirectory(dirName);
         }
@@ -226,11 +188,16 @@ export class ProjectTreeComponent {
       if (isMigrated) {
         const datasetName = data.path.trim();
         this.log.debug(`Dataset ${datasetName} is migrated`);
-        this.recallDataset(datasetName).subscribe(
+        this.fileExplorer.recallDataset(datasetName).subscribe(
           datasetAttrs => this.log.info(`dataset ${datasetName} recalled, attrs ${JSON.stringify(datasetAttrs)}, update tree here`),
           _err => this.log.warn(`unable to recall dataset ${datasetName}`)
         );
         return;
+        // this.recallDataset(datasetName).subscribe(
+        //   datasetAttrs => this.log.info(`dataset ${datasetName} recalled, attrs ${JSON.stringify(datasetAttrs)}, update tree here`),
+        //   _err => this.log.warn(`unable to recall dataset ${datasetName}`)
+        // );
+        // return;
       }
       if($event.type == 'file'){
         this.editorControl.openFile('', (data)).subscribe(x => {
@@ -241,16 +208,16 @@ export class ProjectTreeComponent {
     }
   }
 
-  private recallDataset(datasetName: string): Observable<DatasetAttributes> {
-    const contentsURI = ZoweZLUX.uriBroker.datasetContentsUri(datasetName);
-    const metadataURI = ZoweZLUX.uriBroker.datasetMetadataUri(datasetName, undefined, undefined, true);
-    return this.httpService.get(contentsURI)
-      .pipe(
-        catchError(_err => of({})),
-        switchMap(() => this.httpService.get(metadataURI)),
-        map(data => data.datasets[0]),
-      );
-  }
+  // private recallDataset(datasetName: string): Observable<DatasetAttributes> {
+  //   const contentsURI = ZoweZLUX.uriBroker.datasetContentsUri(datasetName);
+  //   const metadataURI = ZoweZLUX.uriBroker.datasetMetadataUri(datasetName, undefined, undefined, true);
+  //   return this.httpService.get(contentsURI)
+  //     .pipe(
+  //       catchError(_err => of({})),
+  //       switchMap(() => this.httpService.get(metadataURI)),
+  //       map(data => data.datasets[0]),
+  //     );
+  // }
 
   onPathChanged($event: any) {
     this.editorControl.activeDirectory = $event;
